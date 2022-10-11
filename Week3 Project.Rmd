@@ -1,0 +1,106 @@
+---
+title: "Week3 Project"
+output: pdf_document
+date: "2022-08-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Week 3 NYPD Shooting Incident Data Report
+
+##Project Step 1: Start an Rmd Document, Install Packages and Import the data
+```{r library, message=FALSE, warning=FALSE}
+# install.packages("tidyverse")
+library(tidyverse)
+library(lubridate)
+```
+```{r import data}
+df = read_csv("https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD")
+head(df)
+```
+The dataset has 19 columns which capture shooting incident details from NYPD starting 2006, details include when the incident happened, the where it occured, perpetrator & victim age,sex,race. 
+
+## Project Step 2: Tidy and Transform Your Data
+Firstly I will exclude the following columns in context of  analyzing the data for this assignment:
+X_COORD_CD,Y_COORD_CD,Latitude,Longitude,Lon_Lat,PRECINCT,JURISDICTION_CODE,LOCATION_DESC
+```{r}
+df2 = df %>% select(INCIDENT_KEY, 
+                   OCCUR_DATE,
+                   OCCUR_TIME,
+                   BORO, 
+                   STATISTICAL_MURDER_FLAG,
+                   PERP_AGE_GROUP,
+                   PERP_SEX,
+                   PERP_RACE,
+                   VIC_AGE_GROUP,
+                   VIC_SEX,
+                   VIC_RACE,
+                   Latitude,
+                   Longitude)
+```
+Checking how records do we have where a value is missing for each column.
+```{r}
+lapply(df2, function(x) sum(is.na(x)))
+```
+Removing certain records which seem to have typos/errors under to avoid the model/analysis not be affected by these.
+```{r}
+df_2 = subset(df2, PERP_AGE_GROUP!="1020" & PERP_AGE_GROUP!="224" & PERP_AGE_GROUP!="940")
+```
+Accounting for records that have missing values by populating meaningful description on these.
+```{r}
+df2 = df2 %>% 
+  replace_na(list(PERP_AGE_GROUP = "UNKNOWN", PERP_SEX = "UNKNOWN", PERP_RACE = "UNKNOWN"))
+```
+Converting the columns into factor v/s string as per below:
+Incident Key will be string and all other columns will be factor type given they are categorical. 
+```{r}
+df2$PERP_SEX = recode(df2$PERP_SEX, U = "UNKNOWN")
+df2$VIC_SEX   = recode(df2$VIC_SEX, U = "UNKNOWN")
+df2$INCIDENT_KEY = as.character(df2$INCIDENT_KEY)
+df2$BORO = as.factor(df2$BORO)
+df2$PERP_AGE_GROUP = as.factor(df2$PERP_AGE_GROUP)
+df2$PERP_SEX = as.factor(df2$PERP_SEX)
+df2$PERP_RACE = as.factor(df2$PERP_RACE)
+df2$VIC_AGE_GROUP = as.factor(df2$VIC_AGE_GROUP)
+df2$VIC_SEX = as.factor(df2$VIC_SEX)
+df2$VIC_RACE = as.factor(df2$VIC_RACE)
+# Return summary statistics
+summary(df2)
+```
+
+##Project Step 3: Add Visualizations and Analysis
+
+Visualization 1
+Breakdown of incidents by Boroughs
+Brooklyn has the highest number of incidents among all the boroughs in NYC.
+```{r}
+g <- ggplot(df2, aes(x = BORO)) +
+  geom_bar() +
+  labs(title = "Breakdown by Boroughs",
+       x = "Boroughs",
+       y = "Incident Count") +
+  theme_minimal()
+g
+```
+Visualization 2
+Breakdown of incidents by Victim Age Group
+Victims in 18 to 44 age bracket face highest number of incidents.
+```{r}
+g <- ggplot(df2, aes(x = VIC_AGE_GROUP)) +
+  geom_bar() +
+  labs(title = "Breakdown by Victim Age Group",
+       x = "Victim Age Group",
+       y = "Incident Count") +
+  theme_minimal()
+g
+```
+Trying to see the relationship the statistical murder flag has with the perpetrator's race,sex and age group 
+```{r}
+glm.fit <- glm(STATISTICAL_MURDER_FLAG ~ PERP_RACE + PERP_SEX + PERP_AGE_GROUP, data = df2, family = binomial)
+summary(glm.fit)
+```
+##Project Step 4: Add Bias Identification
+I don't have a first hand experience of living in NYC however going by media,films, interactions with other I was thinking that Bronx would have highest incident but it based on the data Brooklyn has the highest incidents. There can be implicit bias in us where we may be associate older people being more prone to crimes or a person's gender determining the incident rates however looking at this data those implicit bias are completely wrong.
+
